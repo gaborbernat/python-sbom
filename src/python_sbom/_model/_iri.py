@@ -2,6 +2,12 @@
 
 from __future__ import annotations
 
+__lazy_modules__ = [
+    "ipaddress",
+    "typing",
+    "urllib.parse",
+]
+
 import ipaddress
 import re
 import string
