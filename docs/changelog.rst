@@ -3,6 +3,19 @@ Changelog
 
 .. towncrier release notes start
 
+.. _release-0-5-0:
+
+0.5.0 (2026-11-19)
+------------------
+
+.. _release-0-5-0-added:
+
+Added
+~~~~~
+
+- Select installed content providers by their registered name in the ``python_sbom.content_provider.v0`` entry point
+  group (:pr:`35`) by :user:`gaborbernat`.
+
 .. _release-0-4-0:
 
 0.4.0 (2026-11-19)
