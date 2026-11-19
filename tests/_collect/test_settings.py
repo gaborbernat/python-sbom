@@ -66,6 +66,7 @@ def test_unknown_option() -> None:
         pytest.param({"bundled-wheels": "*.whl"}, "`bundled-wheels` in here must be an array", id="bundled-not-list"),
         pytest.param({"bundled-wheels": [1]}, "`bundled-wheels` in here must be an array", id="bundled-not-strings"),
         pytest.param({"content-provider": 1}, "`content-provider` in here must be a string", id="content-provider"),
+        pytest.param({"content-provider": ["a:B", 1]}, "array of strings", id="mixed-providers"),
         pytest.param({"build-backend": 1}, "`build-backend` in here must be a string", id="build-backend"),
         pytest.param({"supplier": "Example"}, "`supplier` in here must be a table", id="supplier-not-table"),
         pytest.param({"supplier": {"name": 1}}, "`supplier` in here must be a table", id="supplier-name"),

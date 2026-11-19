@@ -8,11 +8,13 @@ from typing import TYPE_CHECKING
 import pytest
 
 import python_sbom
-from python_sbom import ContentProvider, SbomError
+from python_sbom import BundledWheelInfo, ContentProvider, Contributions, SbomError
 from python_sbom._collect._content import resolve_provider
 
 if TYPE_CHECKING:
-    from python_sbom import Settings
+    from conftest import ContextFor
+
+    from python_sbom import ProviderContext, Settings
 
 
 @pytest.fixture
@@ -54,6 +56,69 @@ def test_load_from_project(tmp_path: Path, module: str, attribute: str, settings
 def test_option_names_the_provider(tmp_path: Path, module: str, settings: Settings) -> None:
     configured = dataclasses.replace(settings, content_provider=f"{module}:Content")
     assert type(resolve_provider(None, configured, tmp_path)[0]).__name__ == "Content"
+
+
+@pytest.fixture
+def providers(settings: Settings, tmp_path: Path) -> ContentProvider:
+    names = (f"{__name__}:_Upstream", f"{__name__}:_Project", "python_sbom:ContentProvider")
+    return resolve_provider(None, dataclasses.replace(settings, content_provider=names), tmp_path)[0]
+
+
+def test_ordered_contributions(providers: ContentProvider, context_for: ContextFor, tmp_path: Path) -> None:
+    assert providers.contributions(context_for(tmp_path, tmp_path)) == Contributions(
+        components=[{"type": "library", "bom-ref": "zlib", "name": "zlib"}],
+        dependencies=[{"ref": "zlib", "dependsOn": []}],
+        root_properties=[{"name": "extra:by", "value": "upstream"}, {"name": "extra:by", "value": "project"}],
+        tools=[{"type": "application", "bom-ref": "scanner", "name": "scanner"}],
+    )
+
+
+def test_ordered_bundled_wheel_info(providers: ContentProvider, context_for: ContextFor, tmp_path: Path) -> None:
+    context = context_for(tmp_path, tmp_path)
+    results = [providers.bundled_wheel(context, PurePosixPath(name)) for name in ("a.whl", "b.whl")]
+    assert results == [
+        BundledWheelInfo(
+            properties=[{"name": "extra:wheel", "value": name}, {"name": "extra:from", "value": "upstream"}],
+            supplier={"name": "project", "url": []},
+        )
+        for name in ("a.whl", "b.whl")
+    ]
+
+
+class _Upstream(ContentProvider):
+    @staticmethod
+    def contributions(context: ProviderContext) -> Contributions:
+        assert context.previous_contributions == Contributions()
+        return Contributions(
+            components=[{"type": "library", "bom-ref": "zlib", "name": "zlib"}],
+            root_properties=[{"name": "extra:by", "value": "upstream"}],
+            tools=[{"type": "application", "bom-ref": "scanner", "name": "scanner"}],
+        )
+
+    @staticmethod
+    def bundled_wheel(context: ProviderContext, wheel: PurePosixPath) -> BundledWheelInfo:
+        assert context.previous_bundled_wheel == BundledWheelInfo()
+        return BundledWheelInfo(
+            properties=[{"name": "extra:wheel", "value": wheel.name}], supplier={"name": "upstream", "url": []}
+        )
+
+
+class _Project(ContentProvider):
+    @staticmethod
+    def contributions(context: ProviderContext) -> Contributions:
+        return Contributions(
+            dependencies=[{"ref": context.previous_contributions.components[0]["bom-ref"], "dependsOn": []}],
+            root_properties=[{"name": "extra:by", "value": "project"}],
+        )
+
+    @staticmethod
+    def bundled_wheel(context: ProviderContext, wheel: PurePosixPath) -> BundledWheelInfo:
+        assert context.previous_bundled_wheel.properties == [{"name": "extra:wheel", "value": wheel.name}]
+        supplier = context.previous_bundled_wheel.supplier
+        assert supplier is not None
+        return BundledWheelInfo(
+            properties=[{"name": "extra:from", "value": supplier["name"]}], supplier={"name": "project", "url": []}
+        )
 
 
 def test_given_name_wins_over_option(tmp_path: Path, module: str, settings: Settings) -> None:

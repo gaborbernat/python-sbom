@@ -14,37 +14,6 @@ if TYPE_CHECKING:
     from ._types import Component, Dependency, OrganizationalEntity, Property
 
 
-class ProviderContext:
-    """
-    What a content provider may use about the build it contributes to.
-
-    :param root: the project directory
-    :param settings: the project's options
-    :param identity: how the project's SBOMs name it, including the prefix of its properties
-    :param read: reads a member of the artifact being described, for :meth:`read`
-
-    """
-
-    def __init__(
-        self, *, root: Path, settings: Settings, identity: ProjectIdentity, read: Callable[[PurePosixPath], bytes]
-    ) -> None:
-        self.root = root
-        self.settings = settings
-        self.identity = identity
-        self._read = read
-
-    def read(self, path: PurePosixPath) -> bytes:
-        """
-        Read a file of the artifact being described: a member of the built wheel or of the archive.
-
-        :param path: the file's path inside the artifact, as a bundled wheel's path is given
-        :returns: the file's bytes
-        :raises KeyError: when the artifact holds no such file
-
-        """
-        return self._read(path)
-
-
 class ContentProvider:
     """
     Adds what a project knows beyond its metadata to its SBOM; subclass it and override what the project needs.
@@ -120,6 +89,41 @@ class Contributions:
     dependencies: list[Dependency] = field(default_factory=list)
     root_properties: list[Property] = field(default_factory=list)
     tools: list[Component] = field(default_factory=list)
+
+
+class ProviderContext:
+    """
+    What a content provider may use about the build it contributes to.
+
+    :param root: the project directory
+    :param settings: the project's options
+    :param identity: how the project's SBOMs name it, including the prefix of its properties
+    :param read: reads a member of the artifact being described, for :meth:`read`
+    :ivar previous_contributions: contributions from earlier providers during ``contributions``
+    :ivar previous_bundled_wheel: properties and supplier from earlier providers for the current ``bundled_wheel``
+
+    """
+
+    def __init__(
+        self, *, root: Path, settings: Settings, identity: ProjectIdentity, read: Callable[[PurePosixPath], bytes]
+    ) -> None:
+        self.root = root
+        self.settings = settings
+        self.identity = identity
+        self._read = read
+        self.previous_contributions = Contributions()
+        self.previous_bundled_wheel = BundledWheelInfo()
+
+    def read(self, path: PurePosixPath) -> bytes:
+        """
+        Read a file of the artifact being described: a member of the built wheel or of the archive.
+
+        :param path: the file's path inside the artifact, as a bundled wheel's path is given
+        :returns: the file's bytes
+        :raises KeyError: when the artifact holds no such file
+
+        """
+        return self._read(path)
 
 
 __all__ = [

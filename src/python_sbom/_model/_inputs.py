@@ -61,7 +61,7 @@ class Settings:
     :param default_branch: the branch in links to files in the repository when the build's commit is unknown or has
         uncommitted changes
     :param bundled_wheels: glob patterns, relative to the project directory, of wheels the project ships as data files
-    :param content_provider: ``module:attribute`` of the content provider, or ``None``
+    :param content_provider: ``module:attribute`` of one provider, an ordered tuple of provider names, or ``None``
     :param build_backend: the build backend ``python_sbom.backend`` wraps, as ``module`` or ``module:object``, or
         ``None``
 
@@ -71,7 +71,7 @@ class Settings:
     repository: str | None
     default_branch: str
     bundled_wheels: tuple[str, ...]
-    content_provider: str | None
+    content_provider: str | tuple[str, ...] | None
     build_backend: str | None
 
 
