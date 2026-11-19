@@ -33,6 +33,7 @@ jobs:
           {"env": "dev"},
           {"env": "docs"},
           {"env": "fix"},
+          {"env": "fuzz", "python": "3.13"},
           {"env": "type"},
           {"env": "pkg_meta"},
           {"env": "example-cibuildwheel", "python": "3.15"},

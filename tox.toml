@@ -149,7 +149,20 @@ commands = [
 [env.type]
 description = "run type check on code base"
 dependency_groups = [ "type" ]
-commands = [ [ "ty", "check", "--output-format", "concise", "--error-on-warning", "--python-platform", "all", "." ] ]
+commands = [
+  [
+    "ty",
+    "check",
+    "--output-format",
+    "concise",
+    "--error-on-warning",
+    "--python-platform",
+    "all",
+    "--exclude",
+    "tests/_model/fuzz_iri.py",
+    ".",
+  ],
+]
 
 [env.bench]
 description = "time python-sbom's hot paths with pyperf (not run in CI); `prepare` the fixtures first"
@@ -165,6 +178,20 @@ dependency_groups = [ "dev" ]
 commands = [
   [ "uv", "pip", "tree" ],
   [ "python", "-c", "import sys; print(sys.executable)" ],
+]
+
+[env.fuzz]
+description = "Check generated CycloneDX links against the IRI format"
+base_python = [ "3.13" ]
+deps = [ "atheris==3.1", "jsonschema-rs>=0.60.3", "ty>=0.0.100" ]
+dependency_groups = []
+commands = [
+  [ "ty", "check", "--python-version", "3.13", "tests/_model/fuzz_iri.py" ],
+  [
+    "python",
+    "{tox_root}{/}tests{/}_model{/}fuzz_iri.py",
+    { replace = "posargs", default = [ "-runs=10000" ], extend = true }
+  ],
 ]
 
 [env_base.example]
