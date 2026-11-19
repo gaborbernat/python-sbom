@@ -46,24 +46,52 @@ document a rebuild has to reproduce:
             }
             return Contributions(components=[zlib])
 
-To extend an installed provider, list it before your project's provider.
+The context has no method that lists files. A provider that needs the wheel's file list reads its ``RECORD`` through
+:meth:`~python_sbom.ProviderContext.read`, by the path of the project's ``.dist-info`` directory, such as
+``seeder-1.0.dist-info/RECORD``; an archive holds that directory at its top level, and the path reads the same there.
+The provider knows the project's name, and a hook subclass, shown below, can hand it hatchling_'s
+``self.metadata.version``. Any other member reads the same way, by its path inside the artifact.
+
+***************************
+ Share a provider by name
+***************************
+
+A provider package can publish a name that other projects can use in their builds. For example, a distribution named
+``example-sbom-provider`` could register its ``Content`` class in its ``pyproject.toml``:
+
+.. code-block:: toml
+
+    [project]
+    name = 'example-sbom-provider'
+    version = '1.0'
+    dependencies = ['python-sbom']
+
+    [project.entry-points.'python_sbom.content_provider.v0']
+    reusable-provider = 'example_sbom_provider:Content'
+
+In the consuming project, add the distribution to the existing ``build-system.requires`` so the isolated build can
+import it. Select the registered name in ``content-provider``. Only the providers you select run, in the order you
+list them.
 
 .. code-block:: toml
 
     [tool.python-sbom]
-    content-provider = ['upstream_sbom:Provider', 'sbom_content:Content']
+    content-provider = ['reusable-provider', 'sbom_content:Content']
+
+To see which names are available, run this in the Python environment that will build the SBOM:
+
+.. code-block:: python
+
+    from importlib.metadata import entry_points
+
+    for entry in entry_points(group='python_sbom.content_provider.v0'):
+        print(entry.name, entry.value)
 
 In ``contributions``, read ``context.previous_contributions`` to see the components, dependencies, root properties and
 tools that earlier providers added. For example, you can add a dependency for a component by its existing ``bom-ref``.
 In ``bundled_wheel``, ``context.previous_bundled_wheel`` holds the properties and supplier for the current wheel. Treat
 both as read-only and return your additions. python-sbom appends entries in provider order. If several providers name a
 supplier for the same wheel, the last explicit supplier wins.
-
-The context has no method that lists files. A provider that needs the wheel's file list reads its ``RECORD`` through
-:meth:`~python_sbom.ProviderContext.read`, by the path of the project's ``.dist-info`` directory, such as
-``seeder-1.0.dist-info/RECORD``; an archive holds that directory at its top level, and the path reads the same there.
-The provider knows the project's name, and a hook subclass, shown below, can hand it hatchling_'s
-``self.metadata.version``. Any other member reads the same way, by its path inside the artifact.
 
 **************************
  Worked example: a seeder

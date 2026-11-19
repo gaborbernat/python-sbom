@@ -59,7 +59,7 @@ def settings_from_table(table: Mapping[str, Toml], where: str) -> Settings:
     if _strings(content_provider):
         content_provider = tuple(content_provider)
     elif not isinstance(content_provider, str | None):
-        msg = f"`content-provider` in {where} must be a string or an array of strings naming `module:attribute`"
+        msg = f"`content-provider` in {where} must be a string or an array of strings"
         raise SbomError(msg)
     if not isinstance(build_backend := table.get("build-backend"), str | None):
         msg = f"`build-backend` in {where} must be a string, the backend to wrap, `module` or `module:object`"

@@ -12,7 +12,7 @@ from python_sbom import BundledWheelInfo, ContentProvider, Contributions, SbomEr
 from python_sbom._collect._content import resolve_provider
 
 if TYPE_CHECKING:
-    from conftest import ContextFor
+    from conftest import ContextFor, Install
 
     from python_sbom import ProviderContext, Settings
 
@@ -59,8 +59,35 @@ def test_option_names_the_provider(tmp_path: Path, module: str, settings: Settin
 
 
 @pytest.fixture
-def providers(settings: Settings, tmp_path: Path) -> ContentProvider:
-    names = (f"{__name__}:_Upstream", f"{__name__}:_Project", "python_sbom:ContentProvider")
+def installed_providers(tmp_path: Path, install: Install, monkeypatch: pytest.MonkeyPatch) -> str:
+    site = tmp_path / "site"
+    group = "[python_sbom.content_provider.v0]"
+    install(
+        site,
+        "Name: reusable\nVersion: 1.0\n",
+        {
+            "reusable_sbom.py": f"from {__name__} import _Upstream\nprovider = _Upstream()\n".encode(),
+            "reusable-1.0.dist-info/entry_points.txt": (
+                f"{group}\nreusable-provider = reusable_sbom:provider\n"
+                f"ambiguous = {__name__}:_Upstream\nbroken = missing_provider_module:Content\n"
+                "wrong-type = builtins:str\n[another.group]\nreusable-provider = missing_provider_module:Content\n"
+            ).encode(),
+        },
+    )
+    install(
+        site,
+        "Name: second\nVersion: 1.0\n",
+        {
+            "second-1.0.dist-info/entry_points.txt": f"{group}\nambiguous = {__name__}:_Project\n".encode(),
+        },
+    )
+    monkeypatch.syspath_prepend(site)
+    return "reusable-provider"
+
+
+@pytest.fixture
+def providers(settings: Settings, tmp_path: Path, installed_providers: str) -> ContentProvider:
+    names = (installed_providers, f"{__name__}:_Project", "python_sbom:ContentProvider")
     return resolve_provider(None, dataclasses.replace(settings, content_provider=names), tmp_path)[0]
 
 
@@ -166,7 +193,10 @@ def test_provider_class_outside_project_is_no_tool(tmp_path: Path, settings: Set
 @pytest.mark.parametrize(
     ("spec", "message"),
     [
-        pytest.param("tools", "must be `module:attribute`", id="no-attribute"),
+        pytest.param("unknown-provider", "no content provider named 'unknown-provider'", id="unknown-name"),
+        pytest.param("ambiguous", "multiple content providers named 'ambiguous'", id="ambiguous-name"),
+        pytest.param("broken", "does not load from entry point 'missing_provider_module:Content'", id="broken-entry"),
+        pytest.param("wrong-type", "is not a ContentProvider subclass or instance", id="entry-type"),
         pytest.param(":Content", "must be `module:attribute`", id="no-module"),
         pytest.param("tools:Content:x", "does not load from .*: invalid format", id="two-colons"),
         pytest.param("not_a_module_anywhere:Content", "does not load from .*: No module named", id="import-fails"),
@@ -174,6 +204,7 @@ def test_provider_class_outside_project_is_no_tool(tmp_path: Path, settings: Set
         pytest.param("MODULE:missing", "does not load from .*: .* has no attribute 'missing'", id="missing-attribute"),
     ],
 )
+@pytest.mark.usefixtures("installed_providers")
 def test_load_refuses(tmp_path: Path, module: str, spec: str, message: str, settings: Settings) -> None:
     with pytest.raises(SbomError, match=message):
         resolve_provider(spec.replace("MODULE", module), settings, tmp_path)

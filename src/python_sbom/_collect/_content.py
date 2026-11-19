@@ -5,6 +5,7 @@ from __future__ import annotations
 __lazy_modules__ = [
     "copy",
     "importlib.machinery",
+    "importlib.metadata",
     "inspect",
     "pathlib",
     "pkgutil",
@@ -15,8 +16,10 @@ __lazy_modules__ = [
 import inspect
 import pkgutil
 import sys
+from contextlib import contextmanager
 from copy import copy
 from importlib.machinery import PathFinder
+from importlib.metadata import entry_points
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Final
 
@@ -31,6 +34,9 @@ from python_sbom._model._content import (  # simplint: ignore[private-import-pat
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Generator
+    from importlib.metadata import EntryPoint
+
     from python_sbom import ProviderContext
     from python_sbom._model._inputs import Settings  # simplint: ignore[private-import-path]  # avoid root export
 
@@ -55,6 +61,30 @@ def resolve_provider(
 
 
 def _load(spec: str, root: Path) -> ContentProvider:
+    if ":" in spec:
+        with _project_imports(spec, root):
+            try:
+                provider = pkgutil.resolve_name(spec)
+            except (ImportError, AttributeError, ValueError) as error:
+                msg = f"content provider {spec!r} does not load from {root}: {error}"
+                raise SbomError(msg) from error
+    else:
+        entry = _entry_point(spec)
+        try:
+            provider = entry.load()
+        except (ImportError, AttributeError, ValueError) as error:
+            msg = f"content provider {spec!r} does not load from entry point {entry.value!r}: {error}"
+            raise SbomError(msg) from error
+    if isinstance(provider, type) and issubclass(provider, ContentProvider):
+        provider = provider()
+    if not isinstance(provider, ContentProvider):
+        msg = f"content provider {spec!r} is not a ContentProvider subclass or instance"
+        raise SbomError(msg)
+    return provider
+
+
+@contextmanager
+def _project_imports(spec: str, root: Path) -> Generator[None, None, None]:
     # resolve_name also takes a bare module, which is no provider
     module_name, _, attribute = spec.partition(":")
     if not (module_name and attribute):
@@ -69,19 +99,9 @@ def _load(spec: str, root: Path) -> ContentProvider:
             del sys.modules[cached]
     sys.path.insert(0, str(root))
     try:
-        provider = pkgutil.resolve_name(spec)
-    # ValueError: a name resolve_name cannot parse, such as a second colon
-    except (ImportError, AttributeError, ValueError) as error:
-        msg = f"content provider {spec!r} does not load from {root}: {error}"
-        raise SbomError(msg) from error
+        yield
     finally:
         sys.path.remove(str(root))
-    if isinstance(provider, type) and issubclass(provider, ContentProvider):
-        provider = provider()
-    if not isinstance(provider, ContentProvider):
-        msg = f"content provider {spec!r} is not a ContentProvider subclass or instance"
-        raise SbomError(msg)
-    return provider
 
 
 def _imported_elsewhere(module_name: str, root: Path) -> str | None:
@@ -101,6 +121,20 @@ def _imported_elsewhere(module_name: str, root: Path) -> str | None:
             return found.name
         search = None if found.submodule_search_locations is None else list(found.submodule_search_locations)
     return None
+
+
+def _entry_point(name: str) -> EntryPoint:
+    group = "python_sbom.content_provider.v0"
+    matches = entry_points(group=group, name=name)
+    if not matches:
+        msg = f"no content provider named {name!r} is installed in entry point group {group!r}"
+        raise SbomError(msg)
+    if len(matches) > 1:
+        targets = ", ".join(sorted(entry.value for entry in matches))
+        msg = f"multiple content providers named {name!r} in entry point group {group!r}: {targets}"
+        raise SbomError(msg)
+    (entry,) = matches
+    return entry
 
 
 class _Providers(ContentProvider):
