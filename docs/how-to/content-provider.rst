@@ -46,6 +46,19 @@ document a rebuild has to reproduce:
             }
             return Contributions(components=[zlib])
 
+To extend an installed provider, list it before your project's provider.
+
+.. code-block:: toml
+
+    [tool.python-sbom]
+    content-provider = ['upstream_sbom:Provider', 'sbom_content:Content']
+
+In ``contributions``, read ``context.previous_contributions`` to see the components, dependencies, root properties and
+tools that earlier providers added. For example, you can add a dependency for a component by its existing ``bom-ref``.
+In ``bundled_wheel``, ``context.previous_bundled_wheel`` holds the properties and supplier for the current wheel. Treat
+both as read-only and return your additions. python-sbom appends entries in provider order. If several providers name a
+supplier for the same wheel, the last explicit supplier wins.
+
 The context has no method that lists files. A provider that needs the wheel's file list reads its ``RECORD`` through
 :meth:`~python_sbom.ProviderContext.read`, by the path of the project's ``.dist-info`` directory, such as
 ``seeder-1.0.dist-info/RECORD``; an archive holds that directory at its top level, and the path reads the same there.

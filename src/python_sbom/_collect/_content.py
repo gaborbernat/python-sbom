@@ -1,42 +1,57 @@
-"""Resolve the content provider, from an instance, a module:attribute name or the option, and the files defining it."""
+"""Load content providers and identify their project-local source files."""
 
 from __future__ import annotations
 
 __lazy_modules__ = [
+    "copy",
     "importlib.machinery",
     "inspect",
     "pathlib",
     "pkgutil",
     "python_sbom",
-    "python_sbom._model._content",
+    "python_sbom._model._bom",
 ]
 
 import inspect
 import pkgutil
 import sys
+from copy import copy
 from importlib.machinery import PathFinder
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Final
 
 from python_sbom import SbomError
-from python_sbom._model._content import ContentProvider  # simplint: ignore[private-import-path]  # avoid root export
+from python_sbom._model._bom import (  # simplint: ignore[private-import-path]  # avoid root export
+    checked_contributions,
+)
+from python_sbom._model._content import (  # simplint: ignore[private-import-path]  # avoid root export
+    BundledWheelInfo,
+    ContentProvider,
+    Contributions,
+)
 
 if TYPE_CHECKING:
+    from python_sbom import ProviderContext
     from python_sbom._model._inputs import Settings  # simplint: ignore[private-import-path]  # avoid root export
 
 
 def resolve_provider(
     given: ContentProvider | str | None, settings: Settings, root: Path
 ) -> tuple[ContentProvider, tuple[PurePosixPath, ...]]:
-    # an instance wins, as a hook subclass builds one; a module:attribute string overrides the option, as the CLI's flag
-    # does; otherwise the content-provider option, or the provider that adds nothing
-    if isinstance(given, ContentProvider):
-        provider = given
-    elif (spec := settings.content_provider if given is None else given) is None:
-        provider = ContentProvider()
-    else:
+    spec = settings.content_provider if given is None else given
+    if isinstance(spec, ContentProvider):
+        provider = spec
+    elif isinstance(spec, str):
         provider = _load(spec, root)
-    return provider, _provider_scripts(provider, root)
+    elif spec:
+        provider = _Providers(tuple(_load(name, root) for name in spec))
+    else:
+        provider = ContentProvider()
+    members = provider.members if isinstance(provider, _Providers) else (provider,)
+    scripts: dict[PurePosixPath, None] = {}
+    for member in members:
+        scripts.update(dict.fromkeys(_provider_scripts(member, root)))
+    return provider, tuple(scripts)
 
 
 def _load(spec: str, root: Path) -> ContentProvider:
@@ -86,6 +101,34 @@ def _imported_elsewhere(module_name: str, root: Path) -> str | None:
             return found.name
         search = None if found.submodule_search_locations is None else list(found.submodule_search_locations)
     return None
+
+
+class _Providers(ContentProvider):
+    def __init__(self, members: tuple[ContentProvider, ...]) -> None:
+        self.members = members
+
+    def bundled_wheel(self, context: ProviderContext, wheel: PurePosixPath) -> BundledWheelInfo:
+        context = copy(context)
+        combined = BundledWheelInfo()
+        for member in self.members:
+            context.previous_bundled_wheel = combined
+            info = member.bundled_wheel(context, wheel)
+            combined.properties.extend(info.properties)
+            if info.supplier is not None:
+                combined = BundledWheelInfo(properties=combined.properties, supplier=info.supplier)
+        return combined
+
+    def contributions(self, context: ProviderContext) -> Contributions:
+        context = copy(context)
+        combined = Contributions()
+        context.previous_contributions = combined
+        for member in self.members:
+            added = checked_contributions(member.contributions(context), member)
+            combined.components.extend(added.components)
+            combined.dependencies.extend(added.dependencies)
+            combined.root_properties.extend(added.root_properties)
+            combined.tools.extend(added.tools)
+        return combined
 
 
 def _provider_scripts(provider: ContentProvider, root: Path) -> tuple[PurePosixPath, ...]:

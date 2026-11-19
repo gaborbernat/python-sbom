@@ -142,7 +142,17 @@ def test_sdist_has_no_sbom(project: Path, build_wheel: BuildWheel) -> None:
     assert "sboms" not in sdist.read_bytes().decode("latin-1")
 
 
-def test_content_provider_option(project: Path, build_wheel: BuildWheel, tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("option", "count"),
+    [
+        pytest.param("[]", 0, id="empty"),
+        pytest.param("'MODULE:Content'", 1, id="one"),
+        pytest.param("['MODULE:Content', 'MODULE:Content']", 2, id="two"),
+    ],
+)
+def test_content_provider_option(
+    project: Path, build_wheel: BuildWheel, tmp_path: Path, option: str, count: int
+) -> None:
     (project / f"{tmp_path.name}.py").write_text(
         "from python_sbom import ContentProvider, Contributions\n\n\n"
         "class Content(ContentProvider):\n"
@@ -151,10 +161,12 @@ def test_content_provider_option(project: Path, build_wheel: BuildWheel, tmp_pat
         " root_properties=[{'name': 'extra:by', 'value': 'hook'}])\n",
         encoding="utf-8",
     )
-    configure(project, f"[tool.python-sbom]\ncontent-provider = '{tmp_path.name}:Content'\n")
+    configure(project, f"[tool.python-sbom]\ncontent-provider = {option.replace('MODULE', tmp_path.name)}\n")
     document = sbom_of(build_wheel(project))
-    assert {"name": "extra:by", "value": "hook"} in document["metadata"]["component"]["properties"]
-    assert document["metadata"]["tools"]["components"][0]["name"] == f"{tmp_path.name}.py"
+    assert document["metadata"]["component"]["properties"].count({"name": "extra:by", "value": "hook"}) == count
+    assert [tool["name"] for tool in document["metadata"]["tools"]["components"]].count(f"{tmp_path.name}.py") == min(
+        count, 1
+    )
 
 
 def test_seeder_bundles_described(seeder: Path, build_wheel: BuildWheel) -> None:
