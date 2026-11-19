@@ -177,7 +177,7 @@ Provides-Extra: cli
             [info.filename, list(info.date_time), info.compress_type, info.external_attr, _sha256(archive.read(info))]
             for info in archive.infolist()
         ]
-    assert sbom == (_PINNED / "embed.cdx.json").read_bytes()
+    assert sbom == (_PINNED / "embed.expected.json").read_bytes()
     assert members == json.loads((_PINNED / "embed-members.json").read_bytes())
 
 
