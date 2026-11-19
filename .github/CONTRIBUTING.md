@@ -1,5 +1,7 @@
 # Contributing
 
+See the [contribution and test instructions](../CONTRIBUTING.md) before opening a pull request.
+
 Add a `docs/changelog.d/+short-name.<type>.rst` fragment for a change that affects package users. Choose a unique short
 name; the release workflow links the fragment to its merged squash pull request and credits the human author. A pull
 request number is not needed in the filename.
