@@ -53,4 +53,5 @@ jobs:
       version: ${{ github.ref_name }}
       tag: ${{ github.ref_name }}
       artifact-pattern: python-package-distributions
+      assets-directory: dist
       notes-artifact-id: ${{ needs.notes.outputs.artifact-id }}

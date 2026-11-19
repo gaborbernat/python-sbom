@@ -8,8 +8,8 @@ and how we decide whether a report is one.
 ## Reporting a vulnerability
 
 **Do not open a public issue for a security problem.** Use
-[GitHub's private vulnerability reporting](https://github.com/tox-dev/python-sbom/security/advisories/new). If neither
-works for you, email [gaborjbernat@gmail.com](mailto:gaborjbernat@gmail.com).
+[GitHub's private vulnerability reporting](https://github.com/tox-dev/python-sbom/security/advisories/new). If GitHub's
+reporting form is unavailable, email [gaborjbernat@gmail.com](mailto:gaborjbernat@gmail.com).
 
 Include what the attacker controls and what they gain, the steps or a proof of concept, and the versions and platform
 you tested. Write the report yourself; unreviewed tool or model output takes longer to triage.
@@ -45,3 +45,13 @@ publish no advisory. Classify by who supplies the dangerous input, not by how ba
 - Vulnerabilities in the packages an SBOM lists; report those to their projects.
 
 If you cannot tell which side a finding falls on, report it privately and we will decide.
+
+## Verify a release
+
+Download the wheel or source distribution from [PyPI](https://pypi.org/project/python-sbom/#files). Use
+[pypi-attestations](https://github.com/pypi/pypi-attestations) to check the local file against PyPI's signed attestation
+and the repository that published it. For example, to verify the 0.5.0 wheel, run
+
+```console
+uvx pypi-attestations verify pypi --repository https://github.com/tox-dev/python-sbom python_sbom-0.5.0-py3-none-any.whl
+```
