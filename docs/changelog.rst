@@ -3,6 +3,45 @@ Changelog
 
 .. towncrier release notes start
 
+.. _release-0-4-0:
+
+0.4.0 (2026-11-19)
+------------------
+
+.. _release-0-4-0-added:
+
+Added
+~~~~~
+
+- Accept an ordered list in ``content-provider`` so projects can build on the components and bundled-wheel metadata an
+  earlier provider supplied (:pr:`33`) by :user:`gaborbernat`.
+- Expose ``MissingExtraError`` from ``python_sbom`` so callers can catch a missing optional dependency without importing
+  the private errors module (:pr:`9`) by :user:`gaborbernat`.
+
+.. _release-0-4-0-fixed:
+
+Fixed
+~~~~~
+
+- Expose ``ConfigSettings`` at runtime so wildcard imports from ``python_sbom.backend`` no longer fail (:pr:`16`) by
+  :user:`gaborbernat`.
+
+.. _release-0-4-0-documentation:
+
+Documentation
+~~~~~~~~~~~~~
+
+- Explain in the README why the license expression is ``MIT AND Apache-2.0``: the project code is MIT and the bundled
+  CycloneDX schema files are Apache-2.0 (:pr:`28`) by :user:`gaborbernat`. (#27)
+
+.. _release-0-4-0-performance:
+
+Performance
+~~~~~~~~~~~
+
+- Reduce package import and CLI help startup time on Python 3.15 by deferring imports until needed (:pr:`29`) by
+  :user:`gaborbernat`. (#29)
+
 .. _release-0-3-1:
 
 0.3.1 (2026-11-10)
