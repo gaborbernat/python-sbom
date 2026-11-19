@@ -58,6 +58,13 @@ class Describe(Protocol):
     ) -> Document: ...
 
 
+def pytest_configure(config: pytest.Config) -> None:
+    # pdm-backend reads the timestamp at import time, before per-test fixtures run.
+    monkeypatch = pytest.MonkeyPatch()
+    config.add_cleanup(monkeypatch.undo)
+    monkeypatch.delenv("SOURCE_DATE_EPOCH", raising=False)
+
+
 @pytest.fixture
 def write_wheel() -> WriteWheel:
     def write(
