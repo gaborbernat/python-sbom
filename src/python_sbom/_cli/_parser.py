@@ -62,8 +62,8 @@ def _add_build_options(parser: ArgumentParser) -> None:
     )
     parser.add_argument(
         "--content-provider",
-        metavar="MODULE:ATTRIBUTE",
-        help="content provider, overriding the content-provider option",
+        metavar="PROVIDER",
+        help="entry point name or module:attribute, overriding the content-provider option",
     )
 
 

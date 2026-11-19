@@ -50,14 +50,15 @@ Each option is optional; an unknown key fails the build, so a typo cannot pass s
         bundled-wheels = ['src/project/wheels/*.whl']
 
 ``content-provider``
-    A single ``module:attribute`` string or an array of them in the order the providers should run. Each names a
-    :class:`~python_sbom.ContentProvider` class or instance in the project or its build environment. Loading a provider
-    executes its module. See :doc:`/how-to/content-provider`.
+    A string or an ordered array of strings. Use a registered entry point name for an installed provider, or
+    ``module:attribute`` for an importable :class:`~python_sbom.ContentProvider` class or instance. A bare name must
+    match exactly one entry in the ``python_sbom.content_provider.v0`` group. Loading a provider executes its module.
+    See :doc:`/how-to/content-provider`.
 
     .. code-block:: toml
 
         [tool.python-sbom]
-        content-provider = ['upstream_sbom:Provider', 'sbom_content:Content']
+        content-provider = ['reusable-provider', 'sbom_content:Content']
 
 ``build-backend``
     The :term:`build backend` ``python_sbom.backend`` wraps, as ``module`` or ``module:object``, the form
